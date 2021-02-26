@@ -65,8 +65,10 @@ References:
 [Würth Elektronik Wireless Connectivity & Sensors Documentation](https://www.we-online.de/web/en/electronic_components/produkte_pb/service_pbs/wco/handbuecher/wco_handbuecher.php)
 
 App Note: "Proteus Advanced User Guide" - ANR002, ANR005 or ANR009
+
 App Note: "Proteus Peripheral only mode" - ANR004
-App Note: "Proteus High Throughpu mode" - ANR006
+
+App Note: "Proteus High Throughput mode" - ANR006
 
 # Using the Windows 10 Runtime & SDK, Notes:
 
