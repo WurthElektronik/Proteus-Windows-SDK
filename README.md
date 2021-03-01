@@ -2,8 +2,7 @@
 (C) Copyright 2020
 
 License Terms:  
-See license_terms_SDK_Proteus_Win10.pdf included in this project.
-
+[license_terms_SDK_Proteus_Win10.pdf](https://github.com/WurthElektronik/Proteus-Windows-SDK/blob/master/license_terms_SDK_Proteus_Win10.pdf) 
 
 Sources:  
 [Würth Elektronik GitHub](https://github.com/orgs/WurthElektronik/) 
@@ -89,7 +88,7 @@ Refert to: https://software.intel.com/content/www/us/en/develop/articles/using-w
 Check which Bluetooth version is available in my PC: https://www.thewindowsclub.com/how-to-check-bluetooth-version-in-windows-10
 
 Recommended publish options can be found in the screenshot publish_options.jpg
-
+![publish options](https://github.com/WurthElektronik/Proteus-Windows-SDK/blob/master/publish_options.jpg?raw=true)
 
 - - - -
 
