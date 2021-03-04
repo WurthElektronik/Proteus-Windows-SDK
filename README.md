@@ -45,7 +45,7 @@ Known Limitations of Windows 10 Runtime API for Bluetooth Low Energy:
 * Windows 10, Build 1809 or newer.
 * Visual Studio 2019
 * .NET core 3.1 SDK or newer.
-* Windows SDK Version 10.0.18362.0 or newer.isual Studio 2019
+* NuGet dependencies: Microsoft.Windows.SDK.Contracts and Microsoft.Windows.Compatibility
 * .NET framework 4.7 or newer
 * A Windows 10 compatible Bluetooth Low Energy Hardware available to the PC (recommended: Bluetooth 4.2 or newer). This device will show up in the device manager as "Generic Bluetooth Radio" and as "Microsoft Bluetooth LE Enumerator".
 
@@ -71,12 +71,8 @@ App Note: "Proteus High Throughput mode" - ANR006
 
 # Using the Windows 10 Runtime & SDK, Notes:
 
-Check and/or add dependencie(s) to your project:
-C:\Program Files (x86)\Windows Kits\10\UnionMetadata\[version]\Windows.winmd in visual studio project references to use Windows.Devices.Bluetooth and dependant subclasses,
-[version] is for example "10.0.19041.0" can differ on your installation, 10.0.18362.0 is the smallest supported Windows 10 SDK revision that was tested with this sources.  
-The .csproj project file implements autodetection of Versons "10.0.19041.0"  and "10.0.18362.0".
-
-To make this file "Windows.winmd"  available the Windows 10 SDK (Version 10.0.18362.0 or newer) must be installed. Download here (or use vs installer): https://developer.microsoft.com/de-de/windows/downloads/windows-10-sdk/
+The dependency for an installed Windows 10 SDK were replaced by NuGet dependencies to Microsoft.Windows.SDK.Contracts and Microsoft.Windows.Compatibility.
+NuGet will automatically install this dependencies when opening the project for the first time. This requires internet access for Nuget when called by Visual Studio or a manual user action to install the packages.
 
 To make this programm compile in visual studio, installing .net core SDK 3.1 is required. Download here (or use vs installer): https://dotnet.microsoft.com/download
 
@@ -87,7 +83,7 @@ Refert to: https://software.intel.com/content/www/us/en/develop/articles/using-w
 
 Check which Bluetooth version is available in my PC: https://www.thewindowsclub.com/how-to-check-bluetooth-version-in-windows-10
 
-Recommended publish options can be found in the screenshot publish_options.jpg
+Recommended publish options can be found in the screenshot publish_options.jpg, select "file/Folder" twice on first start, then change the "Target runtime" item accordingly:
 ![publish options](https://github.com/WurthElektronik/Proteus-Windows-SDK/blob/master/publish_options.jpg?raw=true)
 
 - - - -

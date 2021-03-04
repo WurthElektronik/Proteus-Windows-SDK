@@ -12,6 +12,9 @@
 		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 		<EnableNETAnalyzers>true</EnableNETAnalyzers>
 		<AnalysisLevel>latest</AnalysisLevel>
+		<Version>1.0.1</Version>
+		<Company>Würth Elektronik eiSos</Company>
+		<Product>Proteus Windows 10 SDK</Product>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -24,26 +27,10 @@
 		<DebugSymbols>false</DebugSymbols>
 	</PropertyGroup>
 
-	<ItemGroup>
-		<Compile Remove="AutoScrollListBox.cs" />
-	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Windows.Compatibility" Version="3.1.0" ExcludeAssets="All" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Reference Include="System.Runtime.WindowsRuntime" ExcludeAssets="All">
-			<HintPath>C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5\System.Runtime.WindowsRuntime.dll</HintPath>
-		</Reference>
-		<Reference Include="System.Runtime.WindowsRuntime.UI.Xaml">
-			<HintPath>C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5\System.Runtime.WindowsRuntime.UI.Xaml.dll</HintPath>
-		</Reference>
-		<Reference Include="Windows">			
-		    <HintPath Condition="Exists('C:\Program Files (x86)\Windows Kits\10\UnionMetadata\10.0.18362.0')">C:\Program Files (x86)\Windows Kits\10\UnionMetadata\10.0.18362.0\Windows.winmd</HintPath>
-			<HintPath Condition="Exists('C:\Program Files (x86)\Windows Kits\10\UnionMetadata\10.0.19041.0')">C:\Program Files (x86)\Windows Kits\10\UnionMetadata\10.0.19041.0\Windows.winmd</HintPath>
-			<IsWinMDFile>true</IsWinMDFile>
-		</Reference>
+		<PackageReference Include="Microsoft.Windows.SDK.Contracts" Version="10.0.19041.1" />
 	</ItemGroup>
 
 </Project>

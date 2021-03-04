@@ -15,7 +15,7 @@
         <Button x:Name="btn_StartScan" Content="Start Scan" HorizontalAlignment="Left" Margin="35,20,0,0" VerticalAlignment="Top" Click="btn_StartScan_Click" Height="20" Width="57"/>
         <Button x:Name="btn_StopScan" Content="Stop Scan" HorizontalAlignment="Left" Margin="105,20,0,0" VerticalAlignment="Top" Click="btn_StopScan_Click" IsEnabled="False" Height="20" Width="56"/>
         <CheckBox x:Name="cb_ApplyUUIDFilter" Content="UUIDFilter" HorizontalAlignment="Left" Margin="174,4,0,0" VerticalAlignment="Top" IsChecked="True" Height="15" Width="74"/>
-        <CheckBox x:Name="cb_ApplyRSSIFilter" Content="RSSIFilter" HorizontalAlignment="Left" Margin="174,23,0,0" VerticalAlignment="Top" IsChecked="True" Height="15" Width="69"/>
+        <CheckBox x:Name="cb_ApplyRSSIFilter" Content="RSSIFilter" HorizontalAlignment="Left" Margin="174,23,0,0" VerticalAlignment="Top" IsChecked="False" Height="15" Width="69"/>
         <Button x:Name="btn_Connect" Content="Connect" HorizontalAlignment="Left" Margin="291,9,0,0" VerticalAlignment="Top" Click="btn_Connect_Click" IsEnabled="False" Height="20" Width="48"/>
         <Button x:Name="btn_Disconnect" Content="Disconnect" HorizontalAlignment="Left" Margin="291,32,0,0" VerticalAlignment="Top" Click="btn_Disconnect_Click" IsEnabled="False" Height="20" Width="62"/>
         <Grid Margin="5,50,5,5" Grid.ColumnSpan="3">
