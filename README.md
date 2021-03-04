@@ -83,7 +83,7 @@ To make this programm compile in Visual Studio, installing .NET Core SDK 3.1 is 
 
 Check which Bluetooth version is available in my PC: https://www.thewindowsclub.com/how-to-check-bluetooth-version-in-windows-10
 
-Recommended publish options can be found in the screenshot publish_options.jpg, select "File/Folder" twice on first start, then change the "Target runtime" item accordingly to the screenshot and/or your specific requirements. The screenshot shows the publish options that wwere used for generating the file in the publish folder in this repository:
+Recommended publish options can be found in the screenshot publish_options.jpg, select "File/Folder" twice on first start, then change the "Target runtime" item accordingly to the screenshot and/or your specific requirements. The screenshot shows the publish options that were used for generating the file in the publish folder in this repository:
 
 ![publish options](https://github.com/WurthElektronik/Proteus-Windows-SDK/blob/master/publish_options.jpg?raw=true)
 
