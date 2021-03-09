@@ -12,7 +12,7 @@
 		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 		<EnableNETAnalyzers>true</EnableNETAnalyzers>
 		<AnalysisLevel>latest</AnalysisLevel>
-		<Version>1.0.1</Version>
+		<Version>1.0.2</Version>
 		<Company>Würth Elektronik eiSos</Company>
 		<Product>Proteus Windows 10 SDK</Product>
 	</PropertyGroup>

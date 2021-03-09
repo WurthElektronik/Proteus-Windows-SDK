@@ -1,9 +1,12 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
+using System.Security.AccessControl;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -118,6 +121,8 @@ namespace WE_eiSos_BluetoothLE
         /// </summary>
         private readonly string Proteus_default_PIN = "123123";
 
+        private bool isBluetoothLEEneumeratorDeviceAvailable = false;
+
         /// <summary>
         /// for "auto-linebreak" in the listbox. will be synced to actual width of the listbox.
         /// </summary>
@@ -213,6 +218,49 @@ namespace WE_eiSos_BluetoothLE
                 //MessageBox.Show("Caution: GetBluetoothIsEnabledAsync() method did return false. Maybe bluetooth is not active in your device!!", "Warning", MessageBoxButton.OK);
             }
 
+
+            /* check if the registry contains a name "DriverDesc" with value "Microsoft Bluetooth LE Enumerator" which indicates a bluetooth LE compatible device available on the PC */
+
+            try
+            {
+
+
+                /* DriverDesc.value == "Microsoft Bluetooth LE Enumerator" ??? */
+                string keyPath = @"SYSTEM\CurrentControlSet\Control\Class\{e0cbf06c-cd8b-4647-bb8a-263b43f0f974}\0003";
+                string name = "DriverDesc";
+                string value = string.Empty;
+                string expectedValue = "Microsoft Bluetooth LE Enumerator";
+
+
+                using (RegistryKey keys = Registry.LocalMachine.OpenSubKey(keyPath, RegistryKeyPermissionCheck.ReadSubTree, RegistryRights.ReadKey))
+                {
+                    value = keys.GetValue(name).ToString();
+                }
+
+
+                if (value == expectedValue)
+                {
+                    isBluetoothLEEneumeratorDeviceAvailable = true;
+                }
+            }
+            catch(Exception registryReadException)
+            {
+                Console.WriteLine("Exception when accessing registry LE Enumerator Name :=" + registryReadException.Message);
+                isBluetoothLEEneumeratorDeviceAvailable = false;
+            }
+
+
+            if (isBluetoothLEEneumeratorDeviceAvailable != true)
+            {
+                this.addItemToListBox("Warning: registry does not contain the required >Microsoft Bluetooth LE Enumerator< device at the expected position.");
+                this.addItemToListBox("Warning: Most likely you Bluetooth does  not support the Low Energy extension.");
+                this.addItemToListBox("Warning: Please check the readme.md for Bluetooth depencies.");
+            }
+            else
+            {
+                this.addItemToListBox("Info: found >Microsoft Bluetooth LE Enumerator< device.");
+            }
+
             this.btn_StartScan.IsEnabled = true;
         }
 
@@ -271,7 +319,7 @@ namespace WE_eiSos_BluetoothLE
                 {
                     /* apply "linebreak" to fit text line to listbox width */
 
-                    string sub = st.Substring(0, maxStringLength);
+            string sub = st.Substring(0, maxStringLength);
                     this.statusBox.Items.Add(sub);
                     string reststring = st.Substring(maxStringLength, st.Length - maxStringLength);
                     addItemToListBox(reststring);
@@ -1150,7 +1198,11 @@ namespace WE_eiSos_BluetoothLE
                         /// For Proteus we auto-reply with the default pin to have a fast timing.
 #warning "Using the Static Passkey Pin here, can be hardcoded if needed."
 
-                        string text = this.tB_PinNumber.Text;
+                        string text = string.Empty;
+                        System.Windows.Application.Current.Dispatcher.Invoke(
+                            DispatcherPriority.Normal,
+                            (ThreadStart)delegate { text = this.tB_PinNumber.Text; });
+
                         string staticPasskey = Proteus_default_PIN;
                         uint temp = 0;
                         if (uint.TryParse(text,out temp)) /* must be a 6 digit - numeric only pin. 6 digit long is not checked so far! */
