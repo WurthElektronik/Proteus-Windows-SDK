@@ -76,7 +76,7 @@ App Note: "Proteus High Throughput mode" - ANR006
 The dependency for an installed Windows 10 SDK were replaced by NuGet dependencies to Microsoft.Windows.SDK.Contracts and Microsoft.Windows.Compatibility.
 NuGet will automatically install this dependencies when opening the project for the first time. This requires internet access for Nuget when called by Visual Studio or a manual user action to install the packages.
 
-To make this programm compile in Visual Studio, installing .NET Core SDK 3.1 is required. Download here (or use the Visual Studio Installer): https://dotnet.microsoft.com/download
+To make this programm compile in Visual Studio, installing .NET Core SDK 3.1 is required. Download here (or use the Visual Studio Installer): https://dotnet.microsoft.com/download, select the "x86" installer for use with this tool.
 
 
 #### Caution: Bluetooth maximum transfer unit (MTU) and physical data unit (PDU) is not equal to the maximum possible radio packet size or user payload size per radio packet. Large packets may casue fragmentation. Due to protocol overheads a max. user payload of 243 byte per radio frame is supported by Proteus. Depending on the integrated Bluetooth device Windows may or may not support using of the full 243 byte user payload. Windows may also apply fragmentation if the available Bleutooth LE hardware does not support large radio frames. 
