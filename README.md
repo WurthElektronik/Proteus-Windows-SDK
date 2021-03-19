@@ -54,7 +54,8 @@ Known Limitations of Windows 10 Runtime API for Bluetooth Low Energy:
 ## Requirements (for running the published packet)
 
 * Windows 10, Build 1809 or newer.
-* .NET core 3.1 runtime or newer.
+* this packet is published as a 32 bit version ( "x86" ).
+* .NET core 3.1 runtime or newer. ( using the x86 installer for this framework is required for the published packet )
 * .NET framework 4.7 runtime or newer.
 * A Windows 10 compatible Bluetooth Low Energy Hardware available to the PC (recommended: Bluetooth 4.2 or newer). This device will show up in the device manager as "Generic Bluetooth Radio" and as "Microsoft Bluetooth LE Enumerator".
 
