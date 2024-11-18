@@ -1,5 +1,5 @@
 # Wuerth Elektronik eiSos GmbH & Co. KG - Demo App for Proteus, Windows 10
-(C) Copyright 2020
+(C) Copyright 2024
 
 License Terms:  
 [license_terms_SDK_Proteus_Win10.pdf](https://github.com/WurthElektronik/Proteus-Windows-SDK/blob/master/license_terms_SDK_Proteus_Win10.pdf) 
@@ -11,11 +11,12 @@ Sources:
 - - - -
 
 This demo programm (App SDK) uses integrated Windows 10 runtime functions to access, connect and exchange data with Proteus radio modules. 
-It deliberately chooses not to use any 3rd party software that is not available for free to the public, even if it is known that Windows runtime functions does only provide rudimenary functionality.
+It deliberately chooses not to use any 3rd party software that is not available for free to the public, even if it is known that Windows runtime functions does only provide rudimenary Bluetooth LE functionality.
 
-The Demo uses C# and WPF in combination with .NET Core 3.1.
+Release 1.1.0: The Demo uses C# and WPF in combination with .NET 8.0. 
+For .NET Core please use the older version 1.0.x.
 
-#### This App is no "driver" for supporting a Bluetooth Classic like SPP profile to COM port! It is a DEMO application showing the use of proteus modules with their RX and TX profiles for generic data communication with Microsoft Windows 10.
+#### This App is no "driver" for supporting a Bluetooth Classic like SPP profile to COM port! It is a DEMO application showing the use of proteus modules with their RX and TX profiles for generic data communication with Microsoft Windows.
 
 
 This App SDK implements the required methods to:
@@ -34,29 +35,25 @@ Known Limitations of Windows 10 Runtime API for Bluetooth Low Energy:
 * An API "GetBluetoothVersion" is not existing. So users cannot check for the available Bluetooth (LE) Version programmatically when using the Windows RT API for Bluetooth.
 * Windows API does not support pairing without bonding. This means when the Proteus RF_SecFlags setting is 0x03 the connection to the windows PC will fail (the in app pairing will not work: error - handler not registered), but when bonding is enabled in addtion to static passkey (i.e. RF_SecFlags 0x0B, as seen in Peripheral only mode per default), the in-app pairing is working. 
 * Windows API does currently not provide access to trigger any LESC (LE Secure Connection) functions and methods
-* Windows API does not support sending of multiple packets per connection intervall. The maximum end-to-end throughput (of user payload) is expected to show this limitation (i.e.: 1 frame of 243 byte user payload per 7.5ms when using BLE 4.2 or newer in the PC). However reception of multiple packets per intervall seems to be working.
+* Windows API does not support sending of multiple packets per connection intervall. The maximum end-to-end throughput (of user payload) is expected to show this limitation (i.e.: 1 frame of 243 byte user payload per 7.5 ms when using BLE 4.2 or newer in the PC). However reception of multiple packets per intervall seems to be working.
 * Windows Bonding information (in the Windows Bluetooth manager) cannot be removed programmatically via API
 
 #### Caution: Bluetooth Version 3.5 or older does not include Bluetooth Low Energy standard yet. Hence it does not support communication with any BLE device as present with the Proteus product family. Further: Bluetooth 4.1 and 4.0 only support 19 byte of user payload as defined in the Standard. Bluetooth 4.2 and newer may support larger user payload per packet buth this support is optional according to the Bluetooth Standard. 
 
-
 ## Requirements (for compiling)
 
-* Windows 10, Build 1809 or newer.
-* Visual Studio 2019
-* .NET core 3.1 SDK or newer.
-* NuGet dependency: Microsoft.Windows.SDK.Contracts.
+* Windows 10, 22H2 or newer.
+* Visual Studio 2022
+* .NET 8.0 SDK or newer.
+* NuGet dependency: Microsoft.Xaml.Behaviors.Wpf
 * NuGet dependency: Microsoft.Windows.Compatibility.
-* .NET framework 4.7 or newer.
 * A Windows 10 compatible Bluetooth Low Energy Hardware available to the PC (recommended: Bluetooth 4.2 or newer). This device will show up in the device manager as "Generic Bluetooth Radio" and as "Microsoft Bluetooth LE Enumerator".
 
 
 ## Requirements (for running the published packet)
 
-* Windows 10, Build 1809 or newer.
-* this packet is published as a 32 bit version ( "x86" ).
-* .NET core 3.1 runtime or newer. ( using the x86 installer for this framework is required for the published packet )
-* .NET framework 4.7 runtime or newer.
+* Windows 10, 22H2 or newer.
+* .NET 8.0 runtime or newer. ( using the x86 or x64 version of the framework, that was selected in the publish options )
 * A Windows 10 compatible Bluetooth Low Energy Hardware available to the PC (recommended: Bluetooth 4.2 or newer). This device will show up in the device manager as "Generic Bluetooth Radio" and as "Microsoft Bluetooth LE Enumerator".
 
 
@@ -73,11 +70,10 @@ App Note: "Proteus High Throughput mode" - ANR006
 
 # Using the Windows 10 Runtime & SDK, Notes:
 
-The dependency for an installed Windows 10 SDK were replaced by NuGet dependencies to Microsoft.Windows.SDK.Contracts and Microsoft.Windows.Compatibility.
-NuGet will automatically install this dependencies when opening the project for the first time. This requires internet access for Nuget when called by Visual Studio or a manual user action to install the packages.
+The dependency for an installed Windows 10 SDK were replaced by NuGet dependencies to Microsoft.Xaml.Behaviors.Wpf and Microsoft.Windows.Compatibility.
+NuGet will automatically install this dependencies when opening the project for the first time. This requires internet access for Nuget when called by Visual Studio or a manual user action to install the packages. The user may be presented and is required to accept the corresponding licenses by Microsoft if applicable for the plugins.
 
-To make this programm compile in Visual Studio, installing .NET Core SDK 3.1 is required. Download here (or use the Visual Studio Installer): https://dotnet.microsoft.com/download, select the "x86" installer for use with this tool.
-
+To make this programm compile in Visual Studio, installing .NET SDK 8.0 is required. Download here (or use the Visual Studio Installer): https://dotnet.microsoft.com/download. Select the correct variant for your selected build or publis options.
 
 #### Caution: Bluetooth maximum transfer unit (MTU) and physical data unit (PDU) is not equal to the maximum possible radio packet size or user payload size per radio packet. Large packets may casue fragmentation. Due to protocol overheads a max. user payload of 243 byte per radio frame is supported by Proteus. Depending on the integrated Bluetooth device Windows may or may not support using of the full 243 byte user payload. Windows may also apply fragmentation if the available Bleutooth LE hardware does not support large radio frames. 
 
