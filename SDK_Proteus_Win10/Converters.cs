@@ -13,12 +13,6 @@ namespace WE_eiSos_BluetoothLE
                 return null;
             }
 
-            ///  Proteus suppoorts up to 243 byte per packet -> 486 hex digits
-            if (hexString.Length > (2 * 243))
-            {
-                return null;
-            }
-
             byte[] bytes = new byte[hexString.Length / 2]; /// 2 characters per byte
 
             for (int i = 0; i < bytes.Length; i++)
@@ -39,7 +33,5 @@ namespace WE_eiSos_BluetoothLE
 
             return hex.ToString().ToUpper(); /// hexadecimal coded
         }
-
     }
-
 }

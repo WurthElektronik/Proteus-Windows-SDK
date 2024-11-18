@@ -27,7 +27,7 @@
                 <ColumnDefinition Width="450*"/>
             </Grid.ColumnDefinitions>
             <ListBox x:Name="statusBox" Margin="0,5,0,70" HorizontalAlignment="Left" Width="716" Grid.ColumnSpan="3" />
-            <ListView x:Name="lstNames" Margin="15,5,33,5" Grid.Column="4" >
+            <ListView x:Name="lstNames" Margin="15,5,33,70" Grid.Column="4" >
                 <ListView.View>
                     <GridView>
                         <GridViewColumn DisplayMemberBinding="{Binding BleMacAddress}" Header="MAC" Width="100"/>
@@ -40,6 +40,9 @@
             <TextBox x:Name="tb_TxPayload" HorizontalAlignment="Left" Margin="115,0,0,5" TextWrapping="Wrap" Width="560" VerticalAlignment="Bottom" Height="40" Grid.ColumnSpan="3" PreviewTextInput="OnPreviewTextInput"/>
             <Button x:Name="btn_Send" Content="Send" HorizontalAlignment="Left" Margin="69,0,0,5" VerticalAlignment="Bottom" Height="35" IsEnabled="False" Click="btn_Send_Click" Width="40" Grid.Column="2"/>
             <Label x:Name="label_txpalyload_hex" Content="TX Payload [hex]" HorizontalAlignment="Left" Margin="10,0,0,5" VerticalAlignment="Bottom" Width="100" Height="30"/>
+            <CheckBox x:Name="cb_RxThrtoughput" Content="RxThroughput" Grid.Column="4" HorizontalAlignment="Left" Margin="15,637,0,0" VerticalAlignment="Top" Checked="cb_RxThrtoughput_Checked"/>
+            <TextBox x:Name="tb_Throughput_kbit_s" Grid.Column="4" HorizontalAlignment="Left" Margin="156,637,0,0" Text="0" TextWrapping="Wrap" VerticalAlignment="Top" Width="60" IsReadOnly="True"/>
+            <Label Content="kbit/s" Grid.Column="4" HorizontalAlignment="Left" Margin="221,634,0,0" VerticalAlignment="Top"/>
         </Grid>
         <CheckBox x:Name="cb_PairingEnabled" Content="PairingEnabled" HorizontalAlignment="Left" Margin="378,9,0,0" VerticalAlignment="Top" IsChecked="False" IsEnabled="False" Height="15" Width="98"/>
         <CheckBox x:Name="cb_UnPairingEnabled" Content="UnpairingOnDisconnect" HorizontalAlignment="Left" Margin="378,30,0,0" VerticalAlignment="Top" IsChecked="True" IsEnabled="False" Height="15" Width="146"/>

@@ -1,36 +1,44 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="Init">
 
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
-		<TargetFramework>netcoreapp3.1</TargetFramework>
+		<TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+		<TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+		<SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
 		<UseWPF>true</UseWPF>
 		<AssemblyName>ProteusConnect_Win10</AssemblyName>
 		<RootNamespace>WE_eiSos_BluetoothLE</RootNamespace>
-		<StartupObject></StartupObject>
+		<StartupObject>WE_eiSos_BluetoothLE.App</StartupObject>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<NoWin32Manifest>true</NoWin32Manifest>
 		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 		<EnableNETAnalyzers>true</EnableNETAnalyzers>
 		<AnalysisLevel>latest</AnalysisLevel>
-		<Version>1.0.2</Version>
+		<Version>1.1.0</Version>
 		<Company>Würth Elektronik eiSos</Company>
 		<Product>Proteus Windows 10 SDK</Product>
+		<RepositoryUrl>https://github.com/WurthElektronik/Proteus-Windows-SDK</RepositoryUrl>
+		<RepositoryType>Git</RepositoryType>
+	
 	</PropertyGroup>
+	<Target Name="Init">
+		<Warning Text="$(TargetFrameworkMoniker)" />
+		<Warning Text="$(TargetPlatformMoniker)" />
+	</Target>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
 		<WarningLevel>4</WarningLevel>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-		<PlatformTarget>x86</PlatformTarget>
 		<DebugType>none</DebugType>
 		<DebugSymbols>false</DebugSymbols>
 	</PropertyGroup>
 
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Windows.Compatibility" Version="3.1.0" ExcludeAssets="All" />
-		<PackageReference Include="Microsoft.Windows.SDK.Contracts" Version="10.0.19041.1" />
+		<PackageReference Include="Microsoft.Windows.Compatibility" Version="8.0.8" />
+		<PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.122" />
 	</ItemGroup>
 
 </Project>

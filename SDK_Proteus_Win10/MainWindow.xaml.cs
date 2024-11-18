@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Security.AccessControl;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,9 +22,8 @@ using Windows.Foundation.Metadata;
 using Windows.Security.Credentials;
 using Windows.Storage.Streams;
 
-
 /// ****************************************************************************************************************
-/// Copyright 2020: Würth Elektronik eiSos GmbH & Co. KG
+/// Copyright 2024: Würth Elektronik eiSos GmbH & Co. KG
 /// 
 ///  THE SOFTWARE INCLUDING THE SOURCE CODE IS PROVIDED “AS IS”. YOU ACKNOWLEDGE THAT WÜRTH ELEKTRONIK
 ///  EISOS MAKES NO REPRESENTATIONS AND WARRANTIES OF ANY KIND RELATED TO, BUT NOT LIMITED
@@ -78,11 +78,11 @@ namespace WE_eiSos_BluetoothLE
         /// The following 4 are the 128 bit UUIDs used by Proteus modules for generic data transmission.
         /// Proteus may include further standard-UUIDs (e.g. device information service and/or others).
         /// </summary>
-        public static readonly Guid PROTEUS_Base_UUID = new Guid("6E400000-C352-11E5-953D-0002A5D5C51B");
         public static readonly Guid PROTEUS_PrimaryService_UUID = new Guid("6E400001-C352-11E5-953D-0002A5D5C51B");
         public static readonly Guid PROTEUS_TX_CHARACTERISTIC_UUID = new Guid("6E400002-C352-11E5-953D-0002A5D5C51B");
         public static readonly Guid PROTEUS_RX_CHARACTERISTIC_UUID = new Guid("6E400003-C352-11E5-953D-0002A5D5C51B");
-
+        public static readonly Guid BLE_BATTERY_PrimaryService_UUID = Windows.Devices.Bluetooth.GenericAttributeProfile.GattServiceUuids.Battery;
+        public static readonly Guid BLE_BATTERY_CHARACTERISTIC_UUID = Windows.Devices.Bluetooth.GenericAttributeProfile.GattCharacteristicUuids.BatteryLevel;
         /// <summary>
         /// This is the characteristic for sending data to the Proteus radio module
         /// For Multi-Connect applications multiple instances need to be created and maintained
@@ -95,6 +95,13 @@ namespace WE_eiSos_BluetoothLE
         /// For Multi-Connect applications multiple instances need to be created and maintained
         /// </summary>
         private static GattCharacteristic from_proteus = null;
+
+        /// <summary>
+        /// this is the characteristic for receiving data from the battery profile in Proteus radio module.
+        /// To achieve this notifications on this characteristic need to be enabled by the App.
+        /// For Multi-Connect applications multiple instances need to be created and maintained
+        /// </summary>
+        private static GattCharacteristic from_proteus_battery = null;
 
         /// <summary>
         /// this is an instance of the currently connected Bluetooth Low Energy device.
@@ -123,11 +130,20 @@ namespace WE_eiSos_BluetoothLE
 
         private bool isBluetoothLEEneumeratorDeviceAvailable = false;
 
+        private bool isRExThroughputMeasureEnabled = false;
+
+        private DispatcherTimer dispatcherTimer;
+
+        private volatile uint payloadRxCntThroughputByte;
+
+        private volatile uint payloadTxCntThroughputByte;
+
+        private readonly object cntPlLock = new object();
+
         /// <summary>
         /// for "auto-linebreak" in the listbox. will be synced to actual width of the listbox.
         /// </summary>
         private int maxStringLength = 100;
-
         enum RF_SecFlags
         {
             Open,
@@ -150,7 +166,6 @@ namespace WE_eiSos_BluetoothLE
         private static bool isLeSecureConnectionSupported = ApiInformation.IsPropertyPresent("Windows.Devices.Bluetooth.BluetoothAdapter", "AreLowEnergySecureConnectionsSupported");
         #endregion
 
-
         #region "Bluetooth Error Codes Windows RT"
         readonly int E_BLUETOOTH_ATT_WRITE_NOT_PERMITTED = unchecked((int)0x80650003);
         readonly int E_BLUETOOTH_ATT_INVALID_PDU = unchecked((int)0x80650004);
@@ -158,15 +173,13 @@ namespace WE_eiSos_BluetoothLE
         readonly int E_DEVICE_NOT_AVAILABLE = unchecked((int)0x800710df); // HRESULT_FROM_WIN32(ERROR_DEVICE_NOT_AVAILABLE)
         #endregion
 
-
         /// <summary>
         /// Main Window Function. Called once on App Start.
         /// </summary>
         public MainWindow()
         {
             InitializeComponent();
-
-            this.btn_StartScan.IsEnabled = false;
+            this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StartScan.IsEnabled = false));
 
             scannedItems = new ObservableCollection<pubBleScanItem>();
             scannedItems.OrderBy(x => x.BleMacAddress);
@@ -178,10 +191,9 @@ namespace WE_eiSos_BluetoothLE
                 (isLeSupported != true) ||
                 (isLeSecureConnectionSupported != true))
             {
-                MessageBox.Show("A must-have feature for this app is not supported by your system (at least one of: central role, BLE). App will be closed.");
+                MessageBox.Show("A must-have feature for this app is not supported by your system (at least one of: central role, Bluetooth LE). App will be closed.");
                 return;
             }
-
 
             cB_minSecurityLevel.ItemsSource = Enum.GetValues(typeof(RF_SecFlags));
             cB_minSecurityLevel.SelectedIndex = 0;
@@ -190,7 +202,6 @@ namespace WE_eiSos_BluetoothLE
             {
                 leWatcher = new BluetoothLEAdvertisementWatcher();
                 leWatcher.SignalStrengthFilter = new BluetoothSignalStrengthFilter();
-
 
 #warning "ScanningMode - when beacons or advertise extensions shall be received using BluetoothLEScanningMode.Active is required"
                 leWatcher.ScanningMode = BluetoothLEScanningMode.Passive; /* BluetoothLEScanningMode.Passive or BluetoothLEScanningMode.Active */
@@ -208,22 +219,9 @@ namespace WE_eiSos_BluetoothLE
                 Console.WriteLine("Exception :=" + ex.Message);
             }
 
-            Task<bool> checkBtEnabledTask = GetBluetoothIsEnabledAsync();
-            checkBtEnabledTask.Wait();
-            bool checkResult = checkBtEnabledTask.Result;
-
-            if (checkResult == false)
-            {
-                /* it seems to be the case that the function always requrns (checkResult == false) when the publised version is run. But that has nothing to say in this case because bluetooth is available. */
-                //MessageBox.Show("Caution: GetBluetoothIsEnabledAsync() method did return false. Maybe bluetooth is not active in your device!!", "Warning", MessageBoxButton.OK);
-            }
-
-
-            /* check if the registry contains a name "DriverDesc" with value "Microsoft Bluetooth LE Enumerator" which indicates a bluetooth LE compatible device available on the PC */
-
             try
             {
-
+                /* check if the registry contains a name "DriverDesc" with value "Microsoft Bluetooth LE Enumerator" which indicates a bluetooth LE compatible device available on the PC */
 
                 /* DriverDesc.value == "Microsoft Bluetooth LE Enumerator" ??? */
                 string keyPath = @"SYSTEM\CurrentControlSet\Control\Class\{e0cbf06c-cd8b-4647-bb8a-263b43f0f974}\0003";
@@ -231,37 +229,51 @@ namespace WE_eiSos_BluetoothLE
                 string value = string.Empty;
                 string expectedValue = "Microsoft Bluetooth LE Enumerator";
 
-
                 using (RegistryKey keys = Registry.LocalMachine.OpenSubKey(keyPath, RegistryKeyPermissionCheck.ReadSubTree, RegistryRights.ReadKey))
                 {
+                    if (keys == null)
+                    {
+                        MessageBox.Show("No suitable Bluetooth hardware found in the registry. Programm will be closed.");
+                        this.Close();
+                        return;
+                    }
                     value = keys.GetValue(name).ToString();
                 }
-
 
                 if (value == expectedValue)
                 {
                     isBluetoothLEEneumeratorDeviceAvailable = true;
                 }
             }
-            catch(Exception registryReadException)
+            catch (Exception registryReadException)
             {
                 Console.WriteLine("Exception when accessing registry LE Enumerator Name :=" + registryReadException.Message);
                 isBluetoothLEEneumeratorDeviceAvailable = false;
             }
 
-
             if (isBluetoothLEEneumeratorDeviceAvailable != true)
             {
-                this.addItemToListBox("Warning: registry does not contain the required >Microsoft Bluetooth LE Enumerator< device at the expected position.");
-                this.addItemToListBox("Warning: Most likely you Bluetooth does  not support the Low Energy extension.");
-                this.addItemToListBox("Warning: Please check the readme.md for Bluetooth depencies.");
+                this.addItemToListBox("Warning: The registry does not contain the required >Microsoft Bluetooth LE Enumerator< device at the expected position.");
+                this.addItemToListBox("Warning: Most likely your Bluetooth function does not support the Low Energy extension.");
+                this.addItemToListBox("Warning: Please check the readme.md for Bluetooth dependencies.");
             }
             else
             {
-                this.addItemToListBox("Info: found >Microsoft Bluetooth LE Enumerator< device.");
+                this.addItemToListBox("Info: Found >Microsoft Bluetooth LE Enumerator< device.");
             }
 
-            this.btn_StartScan.IsEnabled = true;
+            this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StartScan.IsEnabled = true));
+            this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StartScan.Background = new SolidColorBrush(Colors.LightGreen)));
+
+            lock (cntPlLock)
+            {
+                payloadRxCntThroughputByte = 0;
+            }
+
+            this.dispatcherTimer = new DispatcherTimer();
+            this.dispatcherTimer.Stop();
+            this.dispatcherTimer.Tick += new EventHandler(dispatcherTimer_Tick);
+            this.dispatcherTimer.Interval = new TimeSpan(0, 0, 5); /* 5000 ms */
         }
 
         /// <summary>
@@ -279,7 +291,7 @@ namespace WE_eiSos_BluetoothLE
 
             if (bluetoothRadio == null)
             {
-                this.addItemToListBox("Warning: radios.FirstOrDefault found no Bluetooth device.");
+                this.addItemToListBox("Warning: radios.FirstOrDefault did not find any Bluetooth device.");
             }
             else
             {
@@ -292,12 +304,12 @@ namespace WE_eiSos_BluetoothLE
 
             if (otherRadio != null)
             {
-                this.addItemToListBox("Info: radios.FirstOrDefault found a Other radio device.");
+                this.addItemToListBox("Info: radios.FirstOrDefault found a 'Other' radio device.");
             }
 
             if (wifiRadio != null)
             {
-                this.addItemToListBox("Info: radios.FirstOrDefault found a WiFi radio device.");
+                this.addItemToListBox("Info: radios.FirstOrDefault found a 'WiFi' radio device.");
             }
 
             return (bluetoothRadio != null) && (bluetoothRadio.State == RadioState.On);
@@ -318,13 +330,10 @@ namespace WE_eiSos_BluetoothLE
                 else
                 {
                     /* apply "linebreak" to fit text line to listbox width */
-
-            string sub = st.Substring(0, maxStringLength);
+                    string sub = st.Substring(0, maxStringLength);
                     this.statusBox.Items.Add(sub);
                     string reststring = st.Substring(maxStringLength, st.Length - maxStringLength);
                     addItemToListBox(reststring);
-
-
                 }
 
                 /* scroll to last entry in statusBox */
@@ -336,7 +345,6 @@ namespace WE_eiSos_BluetoothLE
             }
             ));
         }
-
 
         private void NumberValidationTextBox(object sender, TextCompositionEventArgs e)
         {
@@ -385,6 +393,8 @@ namespace WE_eiSos_BluetoothLE
                     this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StartScan.IsEnabled = false));
                     this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StopScan.IsEnabled = true));
 
+                    this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StopScan.Background = new SolidColorBrush(Colors.LightGreen)));
+                    this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StartScan.Background = new SolidColorBrush(SystemColors.ControlColor)));
 
                     leAdvertiseFilter = new BluetoothLEAdvertisementFilter();
                     if (cb_ApplyUUIDFilter.IsChecked == true)
@@ -420,16 +430,16 @@ namespace WE_eiSos_BluetoothLE
                     }
 
                     Task.Delay(100); /* 100 millisecond delay just to be safe */
-                    
+
                     if (leWatcher.Status == BluetoothLEAdvertisementWatcherStatus.Started)
                     {
-                        addItemToListBox("Advertise watcher started.");
+                        addItemToListBox("Advertisement watcher started.");
                     }
                 }
             }
             catch (Exception ex3)
             {
-                addItemToListBox("BLE Scan could not be used.\r\n" + "ERROR:  " + ex3.Message.ToString());
+                addItemToListBox("Bluetooth LE scan could not be used.\r\n" + "ERROR:  " + ex3.Message.ToString());
 
                 this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.cb_ApplyUUIDFilter.IsEnabled = true));
                 this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.cb_ApplyRSSIFilter.IsEnabled = true));
@@ -437,7 +447,7 @@ namespace WE_eiSos_BluetoothLE
                 this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StartScan.IsEnabled = true));
                 this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StopScan.IsEnabled = false));
 
-                addItemToListBox("\r\n" + "Enable Bluetooth function in devicemanager and check that a Bluetooth LE compatible device is correctly installed in your PC.");
+                addItemToListBox("\r\n" + "Enable Bluetooth function in device manager and check that a Bluetooth LE compatible device is correctly installed in your PC.");
             }
         }
 
@@ -460,6 +470,8 @@ namespace WE_eiSos_BluetoothLE
                     if (this.scannedItems.Count == 1)
                     {
                         this.lstNames.SelectedIndex = 0;
+                        this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Connect.Background = new SolidColorBrush(Colors.LightGreen)));
+                        this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StartScan.Background = new SolidColorBrush(Colors.LightGreen)));
                     }
                 }
             }
@@ -483,8 +495,12 @@ namespace WE_eiSos_BluetoothLE
                 {
                     /* no scan running, connection process may start */
 
+                    this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Connect.Background = new SolidColorBrush(SystemColors.ControlColor)));
+                    this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StartScan.Background = new SolidColorBrush(SystemColors.ControlColor)));
                     this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Connect.IsEnabled = false));
+                    this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StartScan.IsEnabled = false));
                     this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.cb_PairingEnabled.IsEnabled = false));
+                    this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.cB_minSecurityLevel.IsEnabled = false));
 
                     if ((lstNames.Items.Count == 0) ||
                         (this.lstNames.SelectedIndex < 0))
@@ -509,7 +525,7 @@ namespace WE_eiSos_BluetoothLE
             }
             catch (Exception ex4)
             {
-                addItemToListBox("BLE Connect could not be used.\r\n" + "ERROR:  " + ex4.Message.ToString());
+                addItemToListBox("Bluetooth LE connect could not be used.\r\n" + "ERROR:  " + ex4.Message.ToString());
 
                 this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.cb_ApplyUUIDFilter.IsEnabled = true));
                 this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.cb_ApplyRSSIFilter.IsEnabled = true));
@@ -520,7 +536,7 @@ namespace WE_eiSos_BluetoothLE
                 this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Connect.IsEnabled = false));
                 this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Disconnect.IsEnabled = false));
 
-                addItemToListBox("\r\n" + "Enable Bluetooth function in devicemanager and check that a Bluetooth LE compatible device is correctly installed in your PC.");
+                addItemToListBox("\r\n" + "Enable Bluetooth function in device manager and check that a Bluetooth LE compatible device is correctly installed in your PC.");
             }
         }
 
@@ -533,6 +549,8 @@ namespace WE_eiSos_BluetoothLE
         {
             /// just set the flag - the event will be called when disconnected
             this.disconnectRequested = true;
+            isRExThroughputMeasureEnabled = false;
+
         }
 
         /// <summary>
@@ -542,31 +560,36 @@ namespace WE_eiSos_BluetoothLE
         /// <param name="e"></param>
         private void btn_Send_Click(object sender, RoutedEventArgs e)
         {
+            if (isBleConnected != true)
+            {
+                return;
+            }
+
+            /// payload is taken from textbox (i.e. hexadecimal string)
+            byte[] payload = Converters.StringToByteArray(this.tb_TxPayload.Text);
+
+            ///StringToByteArray() will return null when: sting has not even number of characters or string is longer than max MTU for Proteus.
+            if (payload == null)
+            {
+                addItemToListBox("TX Proteus: illegal payload. Payload must be even number of characters.");
+                return;
+            }
+
+            if ((payload.Length == 0) || (payload.Length > 243))
+            {
+                addItemToListBox("TX Proteus: illegal payload. Payload must be between 1 and 243 bytes.");
+                return;
+            }
+
             try
             {
-                if (isBleConnected != true)
-                {
-                    return;
-                }
-
-                /// payload is taken from textbox (i.e. hexadecimal string)
-                byte[] payload = Converters.StringToByteArray(this.tb_TxPayload.Text);
-
-                ///StringToByteArray() will return null when: sting has not even number of characters or string is longer than max MTU for Proteus.
-                if (payload != null)
-                {
-                    /// Note: in Bluetooth Low Energy (4.0) compatibility mode: payload size is limited to 19 bytes!
-                    /// Bluetooth 4.2 in your PC is required for larger packets.
-                    SendData(payload);
-                }
-                else
-                {
-                    addItemToListBox("TX Proteus: illegal payload size. Payload must be even and smaller than 243 byte.");
-                }
+                /// Note: in Bluetooth Low Energy (4.0) compatibility mode: payload size is limited to 19 bytes!
+                /// Bluetooth 4.2 in your PC is required for larger packets.
+                SendData(payload);
             }
             catch (Exception ex5)
             {
-                addItemToListBox("BLE SendTo could not be used.\r\n" + "ERROR:  " + ex5.Message.ToString());
+                addItemToListBox("Bluetooth LE SendTo could not be used.\r\n" + "ERROR:  " + ex5.Message.ToString());
                 addItemToListBox("\r\n" + "Enable Bluetooth function in devicemanager and check that a Bluetooth LE compatible device is correctly installed in your PC.");
             }
         }
@@ -595,7 +618,7 @@ namespace WE_eiSos_BluetoothLE
         {
             if (args.Error == BluetoothError.Success)
             {
-                addItemToListBox("Advertise watcher stopped.");
+                addItemToListBox("Advertisement watcher stopped.");
             }
             else
             {
@@ -612,7 +635,7 @@ namespace WE_eiSos_BluetoothLE
 
         /// <summary>
         /// Is triggered when a advertise packet is received.
-        /// This event may be filtered by selected filters (e.g. UUID, RSSI, MAC address, Devicename, ....) and not show any advertising BLE device.
+        /// This event may be filtered by selected filters (e.g. UUID, RSSI, MAC address, Devicename, ....) and not show any advertising Bluetooth LE device.
         /// </summary>
         /// <param name="sender">le advertise watcher the event was triggered by</param>
         /// <param name="args">arguments of the event</param>
@@ -672,12 +695,12 @@ namespace WE_eiSos_BluetoothLE
 
         #endregion "Bluetooth LE Advertisment related Events"
 
-        #region "Connect to Proteus BLE device"
+        #region "Connect to Proteus Bluetooth LE device"
 
         /// <summary>
-        /// Connect to Proteus BLE device
+        /// Connect to Proteus Bluetooth LE device
         /// </summary>
-        /// <param name="mac">6 byte MAC BLE adresse</param>
+        /// <param name="mac">6 byte MAC Bluetooth LE adresse</param>
         private async void ConnectProteusDevice(ulong mac)
         {
             isBleConnected = false;
@@ -702,8 +725,8 @@ namespace WE_eiSos_BluetoothLE
                 await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Connect.IsEnabled = true));
                 await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.tb_TxPayload.Text = string.Empty));
                 await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.cb_PairingEnabled.IsEnabled = true));
-                return; /* do not continue with connect */
 
+                return; /* do not continue with connect */
             }
 
             connectedBluetoothLeDevice.ConnectionStatusChanged += this.OnConnectionStatusChanged;
@@ -761,12 +784,13 @@ namespace WE_eiSos_BluetoothLE
 
                     RF_SecFlags userSelected_RF_SecFlags = (RF_SecFlags)Enum.Parse(typeof(RF_SecFlags), this.cB_minSecurityLevel.SelectedValue.ToString());
 
-
                     switch (userSelected_RF_SecFlags)
                     {
                         case RF_SecFlags.Open:
                             {
-                                pairingKinds = DevicePairingKinds.None;
+                                /* workaround for Proteus default settings (open security, no pairing+bonding) , but cb_PairingEnabled.IsChecked == true is selected by the user -> ConfirmOnly does not cause the could not pair reply, which happens when DevicePairingKinds.None is used instead */
+                                //pairingKinds = DevicePairingKinds.None;
+                                pairingKinds = DevicePairingKinds.ConfirmOnly;
                                 minpairinglevel = DevicePairingProtectionLevel.None;
                             }
                             break;
@@ -814,11 +838,11 @@ namespace WE_eiSos_BluetoothLE
                                 await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Connect.IsEnabled = true));
                                 await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.tb_TxPayload.Text = string.Empty));
                                 await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.cb_PairingEnabled.IsEnabled = true));
+
                                 return; /* do not continue with connect */
                             }
                             //break;
                     }
-
 
                     var result = await connectedBluetoothLeDevice.DeviceInformation.Pairing.Custom.PairAsync(pairingKinds, minpairinglevel);
                     connectedBluetoothLeDevice.DeviceInformation.Pairing.Custom.PairingRequested -= CustomOnPairingRequested;
@@ -836,7 +860,7 @@ namespace WE_eiSos_BluetoothLE
 
                                 //Reload device so that the GATT services are there. This is why we wait.
                                 connectedBluetoothLeDevice = await BluetoothLEDevice.FromBluetoothAddressAsync(mac, BluetoothAddressType.Public);
-                                addItemToListBox("Info: device is already paired.");
+                                addItemToListBox("Info: Device is already paired.");
                             }
                             break;
 
@@ -864,16 +888,26 @@ namespace WE_eiSos_BluetoothLE
                                 isBleConnecting = false;
                                 ///This should not happen.
                                 addItemToListBox("Error: Disconnected during pairing with device. Status: " + result.Status.ToString());
-                                addItemToListBox("Info: Please retry connect with pairing.");
+                                addItemToListBox("Info: Please check proteus security settings and retry with matching security & paring & bonding settings.");
 
                                 connectedBluetoothLeDevice.ConnectionStatusChanged -= this.OnConnectionStatusChanged;
                                 connectedBluetoothLeDevice.GattServicesChanged -= this.OnGattServicesChanged;
 
-                                await Task.Delay(1000);
+                                await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Disconnect.Background = new SolidColorBrush(SystemColors.ControlColor)));
                                 await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Disconnect.IsEnabled = false));
-                                await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Connect.IsEnabled = true));
+
+                                await Task.Delay(1000); /* according to microsoft: wait 1000ms for disconnect ble device happens */
+
                                 await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.tb_TxPayload.Text = string.Empty));
                                 await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.cb_PairingEnabled.IsEnabled = true));
+                                await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.cB_minSecurityLevel.IsEnabled = true));
+
+                                await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Connect.IsEnabled = true));
+                                await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Connect.Background = new SolidColorBrush(Colors.LightGreen)));
+
+                                await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StartScan.IsEnabled = true));
+                                await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StartScan.Background = new SolidColorBrush(Colors.LightGreen)));
+
                                 return; /* do not continue with connect */
                             }
                     }
@@ -917,7 +951,7 @@ namespace WE_eiSos_BluetoothLE
             await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.cb_UnPairingEnabled.IsEnabled = true));
 
             #region "Get Characteristics and enable Notification"
-            serviceResult = await connectedBluetoothLeDevice.GetGattServicesForUuidAsync(PROTEUS_PrimaryService_UUID, BluetoothCacheMode.Uncached);
+            serviceResult = await connectedBluetoothLeDevice.GetGattServicesAsync(BluetoothCacheMode.Uncached);
 
             if (serviceResult.Status == GattCommunicationStatus.Success)
             {
@@ -947,6 +981,7 @@ namespace WE_eiSos_BluetoothLE
 
                                                 /// sending to Proteus is possible now!
                                                 await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Send.IsEnabled = true));
+                                                await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Send.Background = new SolidColorBrush(Colors.LightGreen)));
                                             }
                                             else
                                             {
@@ -1019,6 +1054,79 @@ namespace WE_eiSos_BluetoothLE
                             addItemToListBox("Error reading charateristics of service UUID: " + s.Uuid);
                         }
                     }
+                    else if (s.Uuid == BLE_BATTERY_PrimaryService_UUID)
+                    {
+                        GattCharacteristicsResult characteristicResult = await s.GetCharacteristicsAsync();
+                        if (characteristicResult.Status == GattCommunicationStatus.Success)
+                        {
+                            foreach (GattCharacteristic c in characteristicResult.Characteristics)
+                            {
+                                switch (c.Uuid)
+                                {
+                                    case var r when (r == BLE_BATTERY_CHARACTERISTIC_UUID):
+                                        {
+                                            /// for data receiving from_proteus
+                                            addItemToListBox("Found Proteus Battery Characteristic: " + c.Uuid);
+                                            GattCharacteristicProperties properties = c.CharacteristicProperties;
+
+                                            if (true == properties.HasFlag(GattCharacteristicProperties.Notify))
+                                            {
+                                                try
+                                                {
+                                                    /// This characteristic supports subscribing to notifications.
+                                                    from_proteus_battery = c;
+
+                                                    /// Proteus requires Notifications enabled!
+                                                    GattCommunicationStatus status = await from_proteus_battery.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue.Notify);
+                                                    if (status == GattCommunicationStatus.Success)
+                                                    {
+                                                        /// notifications were enabled, register value changed event for received data from Proteus device
+                                                        subscribedForNotifications = true;
+                                                        from_proteus_battery.ValueChanged += CharacteristicBattery_ValueChanged;
+                                                        addItemToListBox("Enabled notifications for Proteus Battery Characteristic.");
+                                                    }
+                                                    else
+                                                    {
+                                                        /// error: cannot enable notifications
+                                                        from_proteus_battery = null;
+                                                    }
+                                                }
+                                                catch (Exception ex001)
+                                                {
+                                                    if (this.cb_PairingEnabled.IsChecked == false)
+                                                    {
+                                                        addItemToListBox("Connected device requires security, but security + pairing was not selected in the App.");
+                                                        MessageBox.Show(ex001.Message);
+                                                        from_proteus_battery = null;
+                                                    }
+                                                    else
+                                                    {
+                                                        addItemToListBox("Connected device requires security, but security connection failed (wrong pin?).");
+                                                        MessageBox.Show(ex001.Message);
+                                                        from_proteus_battery = null;
+                                                    }
+                                                }
+                                            }
+                                            else
+                                            {
+                                                /// errror: property notification flag missing in property
+                                                from_proteus_battery = null;
+                                            }
+                                        }
+                                        break;
+                                    default:
+                                        {
+                                            addItemToListBox("Found unknown characteristic: " + c.Uuid);
+                                        }
+                                        break;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            addItemToListBox("Error reading charateristics of service UUID: " + s.Uuid);
+                        }
+                    }
                 }
                 #endregion
 
@@ -1044,7 +1152,9 @@ namespace WE_eiSos_BluetoothLE
                     addItemToListBox("Info: Max user payload = (PDU - 4) = " + (maxPduSize - 4).ToString() + "bytes");
 
                     addItemToListBox("Indication: Channel open");
+
                     await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Disconnect.IsEnabled = true));
+                    await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Disconnect.Background = new SolidColorBrush(Colors.LightGreen)));
 
                     while (disconnectRequested == false)
                     {
@@ -1059,7 +1169,6 @@ namespace WE_eiSos_BluetoothLE
                 {
                     connectedBluetoothLeDevice.ConnectionStatusChanged -= this.OnConnectionStatusChanged;
                     connectedBluetoothLeDevice.GattServicesChanged -= this.OnGattServicesChanged;
-
 
                     if (this.cb_UnPairingEnabled.IsChecked == true)
                     {
@@ -1100,8 +1209,8 @@ namespace WE_eiSos_BluetoothLE
                         }
                     }
 
-
                     /// sending is not possible due to disconnect.
+                    await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Send.Background = new SolidColorBrush(SystemColors.ControlColor)));
                     await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Send.IsEnabled = false));
 
                     isBleConnected = false;
@@ -1133,13 +1242,24 @@ namespace WE_eiSos_BluetoothLE
                     GC.Collect();
                     GC.WaitForPendingFinalizers();
 
+                    await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Disconnect.Background = new SolidColorBrush(SystemColors.ControlColor)));
+                    await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Disconnect.IsEnabled = false));
+
                     await Task.Delay(1000); /* according to microsoft: wait 1000ms for disconnect ble device happens */
 
-                    await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Disconnect.IsEnabled = false));
-                    await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Connect.IsEnabled = true));
                     await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.tb_TxPayload.Text = string.Empty));
                     await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.cb_PairingEnabled.IsEnabled = true));
                     await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.cb_UnPairingEnabled.IsEnabled = false));
+                    await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Disconnect.Background = new SolidColorBrush(SystemColors.ControlColor)));
+
+                    await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StartScan.IsEnabled = true));
+                    await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_StartScan.Background = new SolidColorBrush(Colors.LightGreen)));
+
+                    await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Connect.IsEnabled = true));
+                    await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.btn_Connect.Background = new SolidColorBrush(Colors.LightGreen)));
+
+                    await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.cB_minSecurityLevel.IsEnabled = true));
+
                 }
                 else
                 {
@@ -1158,7 +1278,6 @@ namespace WE_eiSos_BluetoothLE
         #endregion
 
         #region "Events: while connected"
-
         private void OnGattServicesChanged(BluetoothLEDevice sender, object args)
         {
             /// currently unused
@@ -1175,7 +1294,6 @@ namespace WE_eiSos_BluetoothLE
                 addItemToListBox("Event: Disconnected from device.");
             }
         }
-
         #endregion
 
         #region "Event: Pairing/Bonding"
@@ -1205,14 +1323,14 @@ namespace WE_eiSos_BluetoothLE
 
                         string staticPasskey = Proteus_default_PIN;
                         uint temp = 0;
-                        if (uint.TryParse(text,out temp)) /* must be a 6 digit - numeric only pin. 6 digit long is not checked so far! */
+                        if (uint.TryParse(text, out temp)) /* must be a 6 digit - numeric only pin. 6 digit long is not checked so far! */
                         {
                             args.Accept(text);
                         }
                         else
                         {
                             args.Accept(Proteus_default_PIN); /* enter Proteus default pin = 123123 */
-                        }                        
+                        }
                     }
                     break;
 
@@ -1258,7 +1376,7 @@ namespace WE_eiSos_BluetoothLE
 
         #endregion "Pairing/Bonding"
 
-        #region "Send data to Proteus BLE device"
+        #region "Send data to Proteus Bluetooth LE device"
 
         /// <summary>
         /// Send payload to Proteus device.
@@ -1274,6 +1392,10 @@ namespace WE_eiSos_BluetoothLE
             }
 
             await this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.tb_TxPayload.Text = string.Empty));
+            lock (cntPlLock)
+            {
+                payloadTxCntThroughputByte = 0;
+            }
 
             var writer = new DataWriter();
             byte[] toSend = new byte[payload.Length + 1];
@@ -1289,6 +1411,10 @@ namespace WE_eiSos_BluetoothLE
                 {
                     // Successfully wrote to device
                     addItemToListBox("TX Proteus payload data: 0x" + Converters.ByteArrayToString(toSend.Skip(1).ToArray())); /* first byte of payload is representing command byte header of the protocol used in proteus. - here: 0x01 for "data" */
+                    lock (cntPlLock)
+                    {
+                        payloadTxCntThroughputByte += (uint)payload.Length;
+                    }
                 }
                 else
                 {
@@ -1302,12 +1428,69 @@ namespace WE_eiSos_BluetoothLE
 
         }
 
-        #endregion "Send data to Proteus BLE device"
+        #region "Tx throughput"
 
-        #region "Event: Received data from Proteus BLE device"
+        bool txThroughput = false;
+        private async void TxThroughput()
+        {
+            RandomNumberGenerator rng = RandomNumberGenerator.Create();
+            payloadTxCntThroughputByte = 0;
+
+            if (isBleConnected == false)
+            {
+                while (txThroughput == true)
+                {
+
+                    uint txSize = 243;
+
+                    byte[] toSend = new byte[txSize];
+                    rng.GetBytes(toSend);
+                    toSend[0] = 0x01; /* Proteus cmd header */
+
+                    /// check if characteristic is avialble and ble device is connected
+                    if ((isBleConnected != true) || (to_proteus == null))
+                    {
+                        return;
+                    }
+
+                    var writer = new DataWriter();
+                    writer.WriteBytes(toSend);
+
+                    try
+                    {
+                        GattCommunicationStatus result = await to_proteus.WriteValueAsync(writer.DetachBuffer(), GattWriteOption.WriteWithResponse); /* WriteWithResponse will result true if ack was received or perform retrys internally. */
+                        if (result == GattCommunicationStatus.Success)
+                        {
+                            // Successfully wrote to device
+                            lock (cntPlLock)
+                            {
+                                payloadTxCntThroughputByte += txSize;
+                            }
+                        }
+                        else
+                        {
+                            addItemToListBox("TX Proteus payload data failed.");
+                        }
+                    }
+                    catch (Exception ex) when (ex.HResult == E_BLUETOOTH_ATT_INVALID_PDU)
+                    {
+                        addItemToListBox("TX Proteus payload data failed. Invalid PDU, too big.");
+                    }
+                }
+            }
+            else
+            {
+                txThroughput = false;
+            }
+        }
+        #endregion "Tx throughput"
+
+        #endregion "Send data to Proteus Bluetooth LE device"
+
+        #region "Event: Received data from Proteus Bluetooth LE device"
 
         /// <summary>
-        /// ValueChanged event handler for connected BLE device. aka: "receive data" in Bluetooth LE terminology.
+        /// ValueChanged event handler for connected Bluetooth LE device. aka: "receive data" in Bluetooth LE terminology.
         /// Note: Notifications must be enabled during connect!
         /// </summary>
         /// <param name="sender">ble device notifying the changed value</param>
@@ -1319,24 +1502,117 @@ namespace WE_eiSos_BluetoothLE
             reader.ReadBytes(output);
             var timestamp = args.Timestamp;
 
-            byte cmd = output[0];
-            switch (cmd)
+            /* note: using isRExThroughputMeasureEnabled will disable displaying messages in the log for performance reasons */
+            if (isRExThroughputMeasureEnabled == true)
             {
-                case 0x01: /* Proteus protocol header = "data" */
-                    addItemToListBox("RX Proteus payload data: 0x" + Converters.ByteArrayToString(output.Skip(1).ToArray()));
-                    break;
+                uint countPl = (uint)(output.ToArray().Length - 1);/* user payload [bytes] ==> output - 1 byte proteus spp-linke profile header, min. 1 byte, max. 243 byte / packet */
+                lock (cntPlLock)
+                {
+                    payloadRxCntThroughputByte += countPl;
+                }
+            }
+            else
+            {
+                /* gui output slows down throughput, only enabled in not rx throughput measurements */
 
-                case 0x04: /* Proteus protocol header = "data + high throughput mode" */
-                    addItemToListBox("RX Proteus payload data (high throughput mode) - time: " + timestamp.Second.ToString() + ":" + timestamp.Millisecond.ToString() + " - 0x" + Converters.ByteArrayToString(output.Skip(1).ToArray()));
-                    break;
+                byte cmd = output[0];
+                switch (cmd)
+                {
+                    case 0x01: /* Proteus protocol header = "data" */
+                        addItemToListBox("RX Proteus payload data: 0x" + Converters.ByteArrayToString(output.Skip(1).ToArray()));
+                        break;
 
-                default: /* Proteus protocol header = "other" */
-                    addItemToListBox("RX Proteus cmd(0x" + cmd.ToString("X2") + ") - data: 0x" + Converters.ByteArrayToString(output.Skip(1).ToArray()));
-                    break;
+                    case 0x04: /* Proteus protocol header = "data + high throughput mode" */
+                        addItemToListBox("RX Proteus payload data (high throughput mode) - time: " + timestamp.Second.ToString() + ":" + timestamp.Millisecond.ToString() + " - 0x" + Converters.ByteArrayToString(output.Skip(1).ToArray()));
+                        break;
+
+                    default: /* Proteus protocol header = "other" */
+                        addItemToListBox("RX Proteus cmd (0x" + cmd.ToString("X2") + ") - data: 0x" + Converters.ByteArrayToString(output.Skip(1).ToArray()));
+                        break;
+                }
             }
         }
 
-        #endregion "Received data from Proteus BLE device"
+        /// <summary>
+        /// ValueChanged event handler for connected Bluetooth LE device. aka: "receive data" in Bluetooth LE terminology.
+        /// Note: Notifications must be enabled during connect!
+        /// </summary>
+        /// <param name="sender">ble device notifying the changed value</param>
+        /// <param name="args">event arguments </param>
+        public void CharacteristicBattery_ValueChanged(GattCharacteristic sender, GattValueChangedEventArgs args)
+        {
+            var reader = DataReader.FromBuffer(args.CharacteristicValue);
+            byte[] output = new byte[reader.UnconsumedBufferLength];
+            reader.ReadBytes(output);
+            var timestamp = args.Timestamp;
 
+#warning "implement battery % to log output"
+
+            addItemToListBox("Proteus Battey level payload data: 0x" + Converters.ByteArrayToString(output.ToArray()));
+        }
+
+        #region "RX throughput"
+        private void cb_RxThrtoughput_Checked(object sender, RoutedEventArgs e)
+        {
+            isRExThroughputMeasureEnabled = false;
+
+            if (isBleConnected == false)
+            {
+                this.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => this.cb_RxThrtoughput.IsChecked = false));
+            }
+            else
+            {
+                if (this.cb_RxThrtoughput.IsChecked == true)
+                {
+                    /* note: using isRExThroughputMeasureEnabled will disable displaying messages in the log for performance reasons */
+                    addItemToListBox("RX user throughput measurement enabled. The received data will not be shown in the log window in this mode for performance reasons.");
+                    isRExThroughputMeasureEnabled = true;
+                    lock (cntPlLock)
+                    {
+                        payloadRxCntThroughputByte = 0;
+                    }
+                    dispatcherTimer.Start();
+                }
+                else
+                {
+                    isRExThroughputMeasureEnabled = false;
+                    dispatcherTimer.Stop();
+                    lock (cntPlLock)
+                    {
+                        payloadRxCntThroughputByte = 0;
+                    }
+                }
+            }
+        }
+
+        private void dispatcherTimer_Tick(object sender, EventArgs e)
+        {
+            uint bitcount = 0;
+            lock (cntPlLock)
+            {
+                bitcount = (uint)(payloadRxCntThroughputByte * 8); /* payloadCntThroughputByte >= 0 */
+                payloadRxCntThroughputByte = 0; /* reset counter */
+            }
+
+            double ticks_s = (double)(this.dispatcherTimer.Interval.TotalMilliseconds / 1000);
+
+            if ((isRExThroughputMeasureEnabled == true) && (bitcount > 0))
+            {
+                double kbitcount = (bitcount / 1024);
+                this.tb_Throughput_kbit_s.Text = (kbitcount / ticks_s).ToString("0.##");
+            }
+            else /* isRExThroughputMeasureEnabled == false */
+            {
+                /* set to 0 kbit/s */
+                if (this.tb_Throughput_kbit_s.Text != 0.ToString("0.##"))
+                {
+                    this.tb_Throughput_kbit_s.Text = 0.ToString("0.##");
+                }
+            }
+        }
+
+        #endregion "RX throughput"
+
+        #endregion "Received data from Proteus Bluetooth LE device"
     }
 }
