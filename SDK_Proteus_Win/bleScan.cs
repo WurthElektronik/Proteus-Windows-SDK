@@ -59,12 +59,13 @@ namespace WE_eiSos_BluetoothLE
                 NotifyPropertyChanged("Rssi");
             }
 
-            if (name != Name)
+            if ((name != Name) && !string.IsNullOrEmpty(Name))
             {
                 name = Name;
                 NotifyPropertyChanged("Name");
             }
         }
+
 
         public bool Equals(pubBleScanItem other)
         {

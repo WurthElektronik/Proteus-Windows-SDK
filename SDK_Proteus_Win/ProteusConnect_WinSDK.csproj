@@ -2,11 +2,11 @@
 
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
-		<TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
-		<TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+		<TargetFramework>net9.0-windows10.0.26100.0</TargetFramework>
+		<TargetPlatformMinVersion>10.0.26100.0</TargetPlatformMinVersion>
 		<SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
 		<UseWPF>true</UseWPF>
-		<AssemblyName>ProteusConnect_Win10</AssemblyName>
+		<AssemblyName>Proteus4Connect_WinSDK</AssemblyName>
 		<RootNamespace>WE_eiSos_BluetoothLE</RootNamespace>
 		<StartupObject>WE_eiSos_BluetoothLE.App</StartupObject>
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
@@ -14,16 +14,15 @@
 		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 		<EnableNETAnalyzers>true</EnableNETAnalyzers>
 		<AnalysisLevel>latest</AnalysisLevel>
-		<Version>1.1.0</Version>
-		<Company>Würth Elektronik eiSos</Company>
-		<Product>Proteus Windows 10 SDK</Product>
+		<Version>1.3.0</Version>
+		<Company>Würth Elektronik eiSos GmbH &amp; Co. KG</Company>
+		<Product>Proteus Windows SDK</Product>
 		<RepositoryUrl>https://github.com/WurthElektronik/Proteus-Windows-SDK</RepositoryUrl>
 		<RepositoryType>Git</RepositoryType>
+		<SupportedOSPlatformVersion>10.0.26100.0</SupportedOSPlatformVersion>
 	
 	</PropertyGroup>
 	<Target Name="Init">
-		<Warning Text="$(TargetFrameworkMoniker)" />
-		<Warning Text="$(TargetPlatformMoniker)" />
 	</Target>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -35,10 +34,10 @@
 		<DebugSymbols>false</DebugSymbols>
 	</PropertyGroup>
 
-
-	<ItemGroup>
-		<PackageReference Include="Microsoft.Windows.Compatibility" Version="8.0.8" />
-		<PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.122" />
+	<ItemGroup>	
+		<!-- Windows SDK targeting pack for .NET. -->
+		<PackageReference Include="Microsoft.Windows.Compatibility" Version="10.0.3" />
+		<PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.135" />
 	</ItemGroup>
 
 </Project>

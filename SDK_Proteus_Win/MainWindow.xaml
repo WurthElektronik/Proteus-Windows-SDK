@@ -14,10 +14,12 @@
         </Grid.ColumnDefinitions>
         <Button x:Name="btn_StartScan" Content="Start Scan" HorizontalAlignment="Left" Margin="35,20,0,0" VerticalAlignment="Top" Click="btn_StartScan_Click" Height="20" Width="57"/>
         <Button x:Name="btn_StopScan" Content="Stop Scan" HorizontalAlignment="Left" Margin="105,20,0,0" VerticalAlignment="Top" Click="btn_StopScan_Click" IsEnabled="False" Height="20" Width="56"/>
-        <CheckBox x:Name="cb_ApplyUUIDFilter" Content="UUIDFilter" HorizontalAlignment="Left" Margin="174,4,0,0" VerticalAlignment="Top" IsChecked="True" Height="15" Width="74"/>
+        <Button x:Name="btn_ClearScan" Content="Clear" HorizontalAlignment="Left" Margin="27,32,0,0" VerticalAlignment="Top" Click="btn_ClearScan_Click" Height="20" Width="62" Grid.Column="1"/>
+        <CheckBox x:Name="cb_ApplyUUIDFilter" Content="UUIDFilter" HorizontalAlignment="Left" Margin="174,4,0,0" VerticalAlignment="Top" IsChecked="False" Height="15" Width="74"/>
         <CheckBox x:Name="cb_ApplyRSSIFilter" Content="RSSIFilter" HorizontalAlignment="Left" Margin="174,23,0,0" VerticalAlignment="Top" IsChecked="False" Height="15" Width="69"/>
-        <Button x:Name="btn_Connect" Content="Connect" HorizontalAlignment="Left" Margin="291,9,0,0" VerticalAlignment="Top" Click="btn_Connect_Click" IsEnabled="False" Height="20" Width="48"/>
-        <Button x:Name="btn_Disconnect" Content="Disconnect" HorizontalAlignment="Left" Margin="291,32,0,0" VerticalAlignment="Top" Click="btn_Disconnect_Click" IsEnabled="False" Height="20" Width="62"/>
+        <CheckBox x:Name="cb_ApplyMACFilter" Content="MACFilter&#xD;&#xA;(0x0018DA)" HorizontalAlignment="Left" Margin="250,4,0,0" VerticalAlignment="Top" IsChecked="True" Height="34" Width="130"/>
+        <Button x:Name="btn_Connect" Content="Connect" HorizontalAlignment="Left" Margin="546,9,0,0" VerticalAlignment="Top" Click="btn_Connect_Click" IsEnabled="False" Height="20" Width="62" RenderTransformOrigin="1.549,0.652"/>
+        <Button x:Name="btn_Disconnect" Content="Disconnect" HorizontalAlignment="Left" Margin="546,32,0,0" VerticalAlignment="Top" Click="btn_Disconnect_Click" IsEnabled="False" Height="20" Width="62"/>
         <Grid Margin="5,50,5,5" Grid.ColumnSpan="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="603.667"/>
@@ -27,7 +29,7 @@
                 <ColumnDefinition Width="450*"/>
             </Grid.ColumnDefinitions>
             <ListBox x:Name="statusBox" Margin="0,5,0,70" HorizontalAlignment="Left" Width="716" Grid.ColumnSpan="3" />
-            <ListView x:Name="lstNames" Margin="15,5,33,70" Grid.Column="4" >
+            <ListView x:Name="lstNames" Margin="15,5,33,10" Grid.Column="4" >
                 <ListView.View>
                     <GridView>
                         <GridViewColumn DisplayMemberBinding="{Binding BleMacAddress}" Header="MAC" Width="100"/>
@@ -40,18 +42,10 @@
             <TextBox x:Name="tb_TxPayload" HorizontalAlignment="Left" Margin="115,0,0,5" TextWrapping="Wrap" Width="560" VerticalAlignment="Bottom" Height="40" Grid.ColumnSpan="3" PreviewTextInput="OnPreviewTextInput"/>
             <Button x:Name="btn_Send" Content="Send" HorizontalAlignment="Left" Margin="69,0,0,5" VerticalAlignment="Bottom" Height="35" IsEnabled="False" Click="btn_Send_Click" Width="40" Grid.Column="2"/>
             <Label x:Name="label_txpalyload_hex" Content="TX Payload [hex]" HorizontalAlignment="Left" Margin="10,0,0,5" VerticalAlignment="Bottom" Width="100" Height="30"/>
-            <CheckBox x:Name="cb_RxThrtoughput" Content="RxThroughput" Grid.Column="4" HorizontalAlignment="Left" Margin="15,637,0,0" VerticalAlignment="Top" Checked="cb_RxThrtoughput_Checked"/>
-            <TextBox x:Name="tb_Throughput_kbit_s" Grid.Column="4" HorizontalAlignment="Left" Margin="156,637,0,0" Text="0" TextWrapping="Wrap" VerticalAlignment="Top" Width="60" IsReadOnly="True"/>
-            <Label Content="kbit/s" Grid.Column="4" HorizontalAlignment="Left" Margin="221,634,0,0" VerticalAlignment="Top"/>
         </Grid>
-        <CheckBox x:Name="cb_PairingEnabled" Content="PairingEnabled" HorizontalAlignment="Left" Margin="378,9,0,0" VerticalAlignment="Top" IsChecked="False" IsEnabled="False" Height="15" Width="98"/>
-        <CheckBox x:Name="cb_UnPairingEnabled" Content="UnpairingOnDisconnect" HorizontalAlignment="Left" Margin="378,30,0,0" VerticalAlignment="Top" IsChecked="True" IsEnabled="False" Height="15" Width="146"/>
-        <Label x:Name="label_to_github" Content="https://github.com/orgs/WurthElektronik/" Grid.Column="1" HorizontalAlignment="Left" Margin="133,7,0,0" VerticalAlignment="Top" Height="26" Width="232" />
-        <ComboBox x:Name="cB_minSecurityLevel" HorizontalAlignment="Left" Margin="717,22,0,0" VerticalAlignment="Top" Width="142" Grid.ColumnSpan="2" IsReadOnly="True" Height="22"/>
+        <Label x:Name="label_to_github" Content="https://github.com/WurthElektronik/Proteus-Windows-SDK" Grid.Column="1" HorizontalAlignment="Center" Margin="0,2,0,0" VerticalAlignment="Top" Height="26" Width="394" />
         <Label Content="Label" HorizontalAlignment="Left" Height="12" Margin="717,10,0,0" VerticalAlignment="Top" Width="70" Grid.ColumnSpan="2"/>
-        <Label Content="SecurityLevel" HorizontalAlignment="Left" Margin="720,-4,0,0" VerticalAlignment="Top" Grid.ColumnSpan="2" Width="169" Height="26"/>
-        <TextBox x:Name="tB_PinNumber" HorizontalAlignment="Left" Margin="583,29,0,0" Text="123123" PreviewTextInput="NumberValidationTextBox" TextWrapping="Wrap" VerticalAlignment="Top" Width="60"/>
-        <Label Content="Pin (StaticPasskey)" HorizontalAlignment="Left" Margin="574,0,0,0" VerticalAlignment="Top" Width="112" Height="26"/>
+        <Button x:Name="btn_Pair" Content="Pair" HorizontalAlignment="Left" Margin="612,9,0,0" VerticalAlignment="Top" Width="62" Click="btn_Pair_Click" IsEnabled="False"/>
     </Grid>
 </Window>
 
